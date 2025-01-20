@@ -5,3 +5,6 @@ flask
 matplotlib
 mlflow
 scikit-learn
+keras
+tensorflow
+hyperopt

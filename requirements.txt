@@ -10,3 +10,4 @@ tensorflow
 hyperopt
 dvc
 dagshub
+dvc-s3

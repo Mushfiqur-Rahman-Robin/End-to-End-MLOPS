@@ -1,0 +1,1852 @@
+****************************************************************************************************
+File: schema.yaml
+****************************************************************************************************
+
+COLUMNS:
+  fixed acidity: float64
+  volatile acidity: float64
+  citric acid: float64
+  residual sugar: float64
+  chlorides: float64
+  free sulfur dioxide: float64
+  total sulfur dioxide: float64
+  density: float64
+  pH: float64
+  sulphates: float64
+  alcohol: float64
+  quality: int64
+
+TARGET_COLUMN: 
+  name: quality
+
+****************************************************************************************************
+File: README.md
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: main.py
+****************************************************************************************************
+
+from src.ds_end_to_end import logger
+from src.ds_end_to_end.pipeline.data_ingestion_pipe import DataIngestionTrainingPipeline
+from src.ds_end_to_end.pipeline.data_validation_pipe import DataValidationTrainingPipeline
+from src.ds_end_to_end.pipeline.data_transformation_pipe import DataTransformationTrainingPipeline
+from src.ds_end_to_end.pipeline.model_trainer_pipe import ModelTrainerTrainingPipeline
+
+
+STAGE_NAME = "Data Ingestion stage"
+
+try:
+    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+    obj = DataIngestionTrainingPipeline()
+    obj.initialize_data_ingestion()
+    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+except Exception as e:
+    logger.exception(e)
+    raise e
+
+STAGE_NAME = "Data Validation stage"
+
+try:
+    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+    obj = DataValidationTrainingPipeline()
+    obj.initiate_data_validation()
+    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+except Exception as e:
+    logger.exception(e)
+    raise e
+
+STAGE_NAME = "Data Transformation stage"
+
+try:
+    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+    obj = DataTransformationTrainingPipeline()
+    obj.initiate_data_transformation()
+    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+except Exception as e:
+    logger.exception(e)
+    raise e
+
+STAGE_NAME = "Model Trainer stage"
+
+try:
+    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+    obj = ModelTrainerTrainingPipeline()
+    obj.initiate_model_training()
+    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+except Exception as e:
+    logger.exception(e)
+    raise e
+
+****************************************************************************************************
+File: setup.py
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: params.yaml
+****************************************************************************************************
+
+ElasticNet:
+  alpha: 0.2
+  l1_ratio: 0.1
+
+****************************************************************************************************
+File: Dockerfile
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: requirements.txt
+****************************************************************************************************
+
+pandas
+mlflow
+notebook
+numpy
+scikit-learn
+matplotlib
+python-box
+pyYAML
+tqdm
+ensure
+joblib
+types-pyYAML
+Flask
+Flask-Cors
+
+****************************************************************************************************
+File: codetotext.py
+****************************************************************************************************
+
+import os
+import argparse
+from pathlib import Path
+import pathspec
+
+# --- Constants for styling the output ---
+HEADER_LINE = "*" * 100
+FILE_SEPARATOR = "\n\n"
+
+# --- Default patterns to ALWAYS ignore, in addition to .gitignore ---
+# This provides a robust baseline for any project.
+DEFAULT_IGNORE_PATTERNS = [
+    # Version control
+    ".git/",
+    # Python virtual environments
+    ".venv/",
+    "venv/",
+    # Python caches
+    "__pycache__/",
+    "*.pyc",
+    # Environment variables
+    ".env",
+    ".env.*",
+    # Dependency lock files
+    "uv.lock",
+    "poetry.lock",
+    "Pipfile.lock",
+    "package-lock.json",
+    "yarn.lock",
+    # Common metadata/config
+    ".gitignore",
+    "LICENSE",
+    "license",
+    # IDE folders
+    ".vscode/",
+    ".idea/",
+    "notebooks/",
+    "data/",
+    "datasets/"
+]
+
+
+def get_gitignore_spec(
+    directory: Path, output_filename: str
+) -> pathspec.PathSpec:
+    """
+    Combines default ignore patterns with patterns from the project's
+    .gitignore file.
+    """
+    gitignore_file = directory / ".gitignore"
+    project_patterns = []
+    if gitignore_file.is_file():
+        with open(gitignore_file, "r", encoding="utf-8") as f:
+            project_patterns = f.readlines()
+
+    # Combine default patterns with project-specific .gitignore patterns
+    # Also, ensure the script's own output file is ignored.
+    all_patterns = DEFAULT_IGNORE_PATTERNS + [output_filename] + project_patterns
+    return pathspec.PathSpec.from_lines("gitwildmatch", all_patterns)
+
+
+def process_directory(
+    root_dir: str, output_file: str, spec: pathspec.PathSpec
+):
+    """
+    Walks through the directory, reads non-ignored files, and writes their
+    content to the output file.
+    """
+    root_path = Path(root_dir).resolve()
+    output_path = Path(output_file).resolve()
+    files_processed = 0
+
+    print(f"Starting to process directory: {root_path}")
+    print(f"Output will be saved to: {output_path}")
+    print("Ignoring files based on .gitignore and a default list.")
+
+    with open(output_path, "w", encoding="utf-8") as outfile:
+        for dirpath, dirnames, filenames in os.walk(root_path, topdown=True):
+            current_path = Path(dirpath)
+
+            # Filter out ignored directories so os.walk doesn't descend into them
+            excluded_dirs = []
+            for d in dirnames:
+                full_dir_path = current_path / d
+                relative_dir_path_str = str(
+                    full_dir_path.relative_to(root_path)
+                ).replace("\\", "/")
+                # Match against directory pattern (e.g., "node_modules/")
+                if spec.match_file(relative_dir_path_str + "/"):
+                    excluded_dirs.append(d)
+
+            dirnames[:] = [d for d in dirnames if d not in excluded_dirs]
+
+            for filename in filenames:
+                full_file_path = current_path / filename
+                relative_file_path = full_file_path.relative_to(root_path)
+                relative_file_path_str = str(relative_file_path).replace(
+                    "\\", "/"
+                )
+
+                if not spec.match_file(relative_file_path_str):
+                    try:
+                        with open(
+                            full_file_path, "r", encoding="utf-8"
+                        ) as infile:
+                            content = infile.read()
+
+                        outfile.write(f"{HEADER_LINE}\n")
+                        outfile.write(f"File: {relative_file_path_str}\n")
+                        outfile.write(f"{HEADER_LINE}\n\n")
+                        outfile.write(content)
+                        outfile.write(FILE_SEPARATOR)
+
+                        print(f"  [+] Added: {relative_file_path_str}")
+                        files_processed += 1
+
+                    except UnicodeDecodeError:
+                        print(
+                            f"  [!] Skipped (binary file): {relative_file_path_str}"
+                        )
+                    except Exception as e:
+                        print(
+                            f"  [!] Error reading {relative_file_path_str}: {e}"
+                        )
+
+    print(f"\nProcessing complete.")
+    print(f"Total files added to {output_file}: {files_processed}")
+
+
+def main():
+    """Main function to parse arguments and start the process."""
+    parser = argparse.ArgumentParser(
+        description="Reads all files in a directory (respecting .gitignore and a default ignore list) and concatenates them into a single text file.",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "-d",
+        "--directory",
+        default=".",
+        help="The root directory of the codebase to process.\n(default: current directory)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="codebase_content.txt",
+        help="The name of the output file.\n(default: codebase_content.txt)",
+    )
+    args = parser.parse_args()
+
+    root_directory = Path(args.directory)
+    if not root_directory.is_dir():
+        print(f"Error: Directory not found at '{args.directory}'")
+        return
+
+    # Get the combined spec of default ignores and .gitignore
+    gitignore_spec = get_gitignore_spec(root_directory, args.output)
+    process_directory(args.directory, args.output, gitignore_spec)
+
+
+if __name__ == "__main__":
+    main()
+
+****************************************************************************************************
+File: template.py
+****************************************************************************************************
+
+import os
+from pathlib import Path
+
+import logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s]: %(message)s:')
+
+project_name = "ds_end_to_end"
+
+list_of_files = [
+    ".github/workflows/.gitkeep",
+    f"src/{project_name}/__init__.py",
+    f"src/{project_name}/components/__init__.py",
+    f"src/{project_name}/utils/__init__.py",
+    f"src/{project_name}/utils/common.py",
+    f"src/{project_name}/config/__init__.py",
+    f"src/{project_name}/config/configuration.py",
+    f"src/{project_name}/pipeline/__init__.py",
+    f"src/{project_name}/entity/__init__.py",
+    f"src/{project_name}/entity/config_entity.py",
+    f"src/{project_name}/constants/__init__.py",
+    "config/config.yaml",
+    "params.yaml",
+    "schema.yaml",
+    "main.py",
+    "Dockerfile",
+    "requirements.txt",
+    "setup.py",
+    "research/research.ipynb",
+    "templates/index.html",
+    "README.md",
+]
+
+for filepath in list_of_files:
+    filepath = Path(filepath)
+    filedir, filename = os.path.split(filepath)
+    if filedir != "":
+        os.makedirs(filedir, exist_ok=True)
+        logging.info(f"Creating directory; {filedir} for the file: {filename}")
+
+    if (not os.path.exists(filepath)) or (os.path.getsize(filepath) == 0):
+        with open(filepath, "w") as f:
+            pass
+            logging.info(f"Creating empty file: {filepath}")
+
+    else:
+        logging.info(f"{filename} is already exists")
+
+****************************************************************************************************
+File: config/config.yaml
+****************************************************************************************************
+
+artifacts_root: artifacts
+
+data_ingestion:
+  root_dir: artifacts/data_ingestion
+  source_URL: https://github.com/krishnaik06/datasets/raw/refs/heads/main/winequality-data.zip
+  local_data_file: artifacts/data_ingestion/data.zip
+  unzip_dir: artifacts/data_ingestion
+
+
+data_validation:
+  root_dir: artifacts/data_validation
+  unzip_data_dir: artifacts/data_ingestion/winequality-red.csv
+  STATUS_FILE: artifacts/data_validation/status.txt
+
+
+data_transformation:
+  root_dir: artifacts/data_transformation
+  data_path: artifacts/data_ingestion/winequality-red.csv
+
+model_trainer:
+  root_dir: artifacts/model_trainer
+  train_data_path: artifacts/data_transformation/train.csv
+  test_data_path: artifacts/data_transformation/test.csv
+  model_name: ElasticNetModel
+  model_path: model.joblib
+
+
+****************************************************************************************************
+File: research/data_validation.ipynb
+****************************************************************************************************
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "71e95f7c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "\n",
+    "%pwd\n",
+    "os.chdir(\"../\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "fd46032d",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>fixed acidity</th>\n",
+       "      <th>volatile acidity</th>\n",
+       "      <th>citric acid</th>\n",
+       "      <th>residual sugar</th>\n",
+       "      <th>chlorides</th>\n",
+       "      <th>free sulfur dioxide</th>\n",
+       "      <th>total sulfur dioxide</th>\n",
+       "      <th>density</th>\n",
+       "      <th>pH</th>\n",
+       "      <th>sulphates</th>\n",
+       "      <th>alcohol</th>\n",
+       "      <th>quality</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>7.4</td>\n",
+       "      <td>0.70</td>\n",
+       "      <td>0.00</td>\n",
+       "      <td>1.9</td>\n",
+       "      <td>0.076</td>\n",
+       "      <td>11.0</td>\n",
+       "      <td>34.0</td>\n",
+       "      <td>0.9978</td>\n",
+       "      <td>3.51</td>\n",
+       "      <td>0.56</td>\n",
+       "      <td>9.4</td>\n",
+       "      <td>5</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>7.8</td>\n",
+       "      <td>0.88</td>\n",
+       "      <td>0.00</td>\n",
+       "      <td>2.6</td>\n",
+       "      <td>0.098</td>\n",
+       "      <td>25.0</td>\n",
+       "      <td>67.0</td>\n",
+       "      <td>0.9968</td>\n",
+       "      <td>3.20</td>\n",
+       "      <td>0.68</td>\n",
+       "      <td>9.8</td>\n",
+       "      <td>5</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>7.8</td>\n",
+       "      <td>0.76</td>\n",
+       "      <td>0.04</td>\n",
+       "      <td>2.3</td>\n",
+       "      <td>0.092</td>\n",
+       "      <td>15.0</td>\n",
+       "      <td>54.0</td>\n",
+       "      <td>0.9970</td>\n",
+       "      <td>3.26</td>\n",
+       "      <td>0.65</td>\n",
+       "      <td>9.8</td>\n",
+       "      <td>5</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>11.2</td>\n",
+       "      <td>0.28</td>\n",
+       "      <td>0.56</td>\n",
+       "      <td>1.9</td>\n",
+       "      <td>0.075</td>\n",
+       "      <td>17.0</td>\n",
+       "      <td>60.0</td>\n",
+       "      <td>0.9980</td>\n",
+       "      <td>3.16</td>\n",
+       "      <td>0.58</td>\n",
+       "      <td>9.8</td>\n",
+       "      <td>6</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>7.4</td>\n",
+       "      <td>0.70</td>\n",
+       "      <td>0.00</td>\n",
+       "      <td>1.9</td>\n",
+       "      <td>0.076</td>\n",
+       "      <td>11.0</td>\n",
+       "      <td>34.0</td>\n",
+       "      <td>0.9978</td>\n",
+       "      <td>3.51</td>\n",
+       "      <td>0.56</td>\n",
+       "      <td>9.4</td>\n",
+       "      <td>5</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   fixed acidity  volatile acidity  citric acid  residual sugar  chlorides  \\\n",
+       "0            7.4              0.70         0.00             1.9      0.076   \n",
+       "1            7.8              0.88         0.00             2.6      0.098   \n",
+       "2            7.8              0.76         0.04             2.3      0.092   \n",
+       "3           11.2              0.28         0.56             1.9      0.075   \n",
+       "4            7.4              0.70         0.00             1.9      0.076   \n",
+       "\n",
+       "   free sulfur dioxide  total sulfur dioxide  density    pH  sulphates  \\\n",
+       "0                 11.0                  34.0   0.9978  3.51       0.56   \n",
+       "1                 25.0                  67.0   0.9968  3.20       0.68   \n",
+       "2                 15.0                  54.0   0.9970  3.26       0.65   \n",
+       "3                 17.0                  60.0   0.9980  3.16       0.58   \n",
+       "4                 11.0                  34.0   0.9978  3.51       0.56   \n",
+       "\n",
+       "   alcohol  quality  \n",
+       "0      9.4        5  \n",
+       "1      9.8        5  \n",
+       "2      9.8        5  \n",
+       "3      9.8        6  \n",
+       "4      9.4        5  "
+      ]
+     },
+     "execution_count": 2,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import pandas as pd\n",
+    "\n",
+    "data = pd.read_csv(\"artifacts/data_ingestion/winequality-red.csv\")\n",
+    "data.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "d7b84983",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "<class 'pandas.core.frame.DataFrame'>\n",
+      "RangeIndex: 1599 entries, 0 to 1598\n",
+      "Data columns (total 12 columns):\n",
+      " #   Column                Non-Null Count  Dtype  \n",
+      "---  ------                --------------  -----  \n",
+      " 0   fixed acidity         1599 non-null   float64\n",
+      " 1   volatile acidity      1599 non-null   float64\n",
+      " 2   citric acid           1599 non-null   float64\n",
+      " 3   residual sugar        1599 non-null   float64\n",
+      " 4   chlorides             1599 non-null   float64\n",
+      " 5   free sulfur dioxide   1599 non-null   float64\n",
+      " 6   total sulfur dioxide  1599 non-null   float64\n",
+      " 7   density               1599 non-null   float64\n",
+      " 8   pH                    1599 non-null   float64\n",
+      " 9   sulphates             1599 non-null   float64\n",
+      " 10  alcohol               1599 non-null   float64\n",
+      " 11  quality               1599 non-null   int64  \n",
+      "dtypes: float64(11), int64(1)\n",
+      "memory usage: 150.0 KB\n"
+     ]
+    }
+   ],
+   "source": [
+    "data.info()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8d5e17df",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "mlops",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+
+
+****************************************************************************************************
+File: research/model_trainer.ipynb
+****************************************************************************************************
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "830a943d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "\n",
+    "%pwd\n",
+    "os.chdir(\"../\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "aaa50602",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from dataclasses import dataclass\n",
+    "from pathlib import Path\n",
+    "\n",
+    "@dataclass\n",
+    "class ModelTrainerConfig:\n",
+    "    root_dir: Path\n",
+    "    train_data_path: Path\n",
+    "    test_data_path: Path\n",
+    "    model_name: str\n",
+    "    alpha: float\n",
+    "    l1_ratio: float\n",
+    "    target_column: str"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "05c03e9a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from src.ds_end_to_end.constants import *\n",
+    "from src.ds_end_to_end.utils.common import read_yaml, create_directories"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "72b3dff1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class ConfigurationManager:\n",
+    "    def __init__(\n",
+    "        self,\n",
+    "        config_filepath = CONFIG_FILE_PATH,\n",
+    "        params_filepath = PARAMS_FILE_PATH,\n",
+    "        schema_filepath = SCHEMA_FILE_PATH):\n",
+    "\n",
+    "        self.config = read_yaml(config_filepath)\n",
+    "        self.params = read_yaml(params_filepath)\n",
+    "        self.schema = read_yaml(schema_filepath)\n",
+    "\n",
+    "        create_directories([self.config.artifacts_root])\n",
+    "\n",
+    "\n",
+    "    def get_model_trainer_config(self) -> ModelTrainerConfig:\n",
+    "        config = self.config.model_trainer\n",
+    "        params = self.params.ElasticNet\n",
+    "        schema = self.schema.TARGET_COLUMN\n",
+    "\n",
+    "        create_directories([config.root_dir])\n",
+    "\n",
+    "        model_trainer_config = ModelTrainerConfig(\n",
+    "            root_dir=config.root_dir,\n",
+    "            train_data_path=config.train_data_path,\n",
+    "            test_data_path=config.test_data_path,\n",
+    "            model_name=config.model_name,\n",
+    "            alpha=params.alpha,\n",
+    "            l1_ratio=params.l1_ratio,\n",
+    "            target_column=schema.name\n",
+    "        )\n",
+    "\n",
+    "        return model_trainer_config"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "463028a9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import os\n",
+    "from src.ds_end_to_end import logger\n",
+    "from sklearn.linear_model import ElasticNet\n",
+    "import joblib"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "02c87dc6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class ModelTrainer:\n",
+    "    def __init__(self, config: ModelTrainerConfig):\n",
+    "        self.config = config\n",
+    "    \n",
+    "    def train(self):\n",
+    "        train_data = pd.read_csv(self.config.train_data_path)\n",
+    "        test_data = pd.read_csv(self.config.test_data_path)\n",
+    "\n",
+    "        train_x = train_data.drop([self.config.target_column], axis=1)\n",
+    "        test_x = test_data.drop([self.config.target_column], axis=1)\n",
+    "        train_y = train_data[[self.config.target_column]]\n",
+    "        test_y = test_data[[self.config.target_column]]\n",
+    "\n",
+    "        lr = ElasticNet(alpha=self.config.alpha, l1_ratio=self.config.l1_ratio, random_state=42)\n",
+    "        lr.fit(train_x, train_y)\n",
+    "\n",
+    "        joblib.dump(lr, os.path.join(self.config.root_dir, self.config.model_name))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "id": "2a862532",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[2025-07-22 17:17:17,622: INFO: common: yaml file: config/config.yaml loaded successfully]\n",
+      "[2025-07-22 17:17:17,624: INFO: common: yaml file: params.yaml loaded successfully]\n",
+      "[2025-07-22 17:17:17,627: INFO: common: yaml file: schema.yaml loaded successfully]\n"
+     ]
+    }
+   ],
+   "source": [
+    "try:\n",
+    "    config = ConfigurationManager()\n",
+    "    model_trainer_config = config.get_model_trainer_config()\n",
+    "    model_trainer_config = ModelTrainer(config=model_trainer_config)\n",
+    "    model_trainer_config.train()\n",
+    "except Exception as e:\n",
+    "    raise e"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "mlops",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+
+
+****************************************************************************************************
+File: research/data_transformation.ipynb
+****************************************************************************************************
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "a156ed76",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "\n",
+    "%pwd\n",
+    "os.chdir(\"../\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "d8bbeac1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from dataclasses import dataclass\n",
+    "from pathlib import Path\n",
+    "\n",
+    "@dataclass\n",
+    "class DataTransformationConfig:\n",
+    "    root_dir: Path\n",
+    "    data_path: Path"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "94fecbd6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from src.ds_end_to_end.constants import *\n",
+    "from src.ds_end_to_end.utils.common import read_yaml, create_directories"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "7e6ad02f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class ConfigurationManager:\n",
+    "    def __init__(\n",
+    "        self,\n",
+    "        config_filepath = CONFIG_FILE_PATH,\n",
+    "        params_filepath = PARAMS_FILE_PATH,\n",
+    "        schema_filepath = SCHEMA_FILE_PATH):\n",
+    "\n",
+    "        self.config = read_yaml(config_filepath)\n",
+    "        self.params = read_yaml(params_filepath)\n",
+    "        self.schema = read_yaml(schema_filepath)\n",
+    "\n",
+    "        create_directories([self.config.artifacts_root])\n",
+    "\n",
+    "    def get_data_transformation_config(self) -> DataTransformationConfig:\n",
+    "        config = self.config.data_transformation\n",
+    "\n",
+    "        create_directories([config.root_dir])\n",
+    "\n",
+    "        data_transformation_config = DataTransformationConfig(\n",
+    "            root_dir=config.root_dir,\n",
+    "            data_path=config.data_path,\n",
+    "        )\n",
+    "\n",
+    "        return data_transformation_config"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "6957c57f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "from src.ds_end_to_end import logger\n",
+    "import pandas as pd\n",
+    "from sklearn.model_selection import train_test_split"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "bdc6a962",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class DataTransformation:\n",
+    "    def __init__(self, config: DataTransformationConfig):\n",
+    "        self.config = config\n",
+    "\n",
+    "    # note: you can add different data transformation techniques\n",
+    "    # i am only adding train test split\n",
+    "    # as the data is already cleaned up\n",
+    "\n",
+    "    def train_test_spliting(self):\n",
+    "        data = pd.read_csv(self.config.data_path)\n",
+    "\n",
+    "        train_data, test_data = train_test_split(data)\n",
+    "\n",
+    "        train_data.to_csv(os.path.join(self.config.root_dir, \"train.csv\"), index = False)\n",
+    "        test_data.to_csv(os.path.join(self.config.root_dir, \"test.csv\"), index = False)\n",
+    "\n",
+    "        logger.info(\"Splited data into train and test\")\n",
+    "        logger.info(f\"Train data: {train_data.shape}\")\n",
+    "        logger.info(f\"Test data: {test_data.shape}\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "mlops",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+
+
+****************************************************************************************************
+File: research/research.ipynb
+****************************************************************************************************
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "0e5f2fdd",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "1\n",
+      "2\n"
+     ]
+    }
+   ],
+   "source": [
+    "from box import ConfigBox\n",
+    "\n",
+    "example = ConfigBox({\"a\": 1, \"b\": 2})\n",
+    "print(example.a)\n",
+    "print(example.b)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "9a1e0ede",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "## explanation for ensure annotations\n",
+    "\n",
+    "from ensure import ensure_annotations"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "e2111979",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_product(a: int, b: int) -> int:\n",
+    "    return a * b"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "b18c1c60",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "6"
+      ]
+     },
+     "execution_count": 6,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "get_product(2, 3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "id": "f22faf99",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "'33'"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "get_product(2, \"3\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "edf1a031",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "@ensure_annotations\n",
+    "def get_product(a: int, b: int) -> int:\n",
+    "    return a * b"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "a3df969b",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "6"
+      ]
+     },
+     "execution_count": 4,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "get_product(2, 3)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "mlops",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+
+
+****************************************************************************************************
+File: research/data_ingestion.ipynb
+****************************************************************************************************
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "de13b960",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Added '/home/mushfiq/Desktop/End-to-End-MLOPS/ds_end_to_end' to sys.path.\n",
+      "\n",
+      "--- Current sys.path for debugging: ---\n",
+      "- /home/mushfiq/Desktop/End-to-End-MLOPS/ds_end_to_end\n",
+      "- /home/mushfiq/anaconda3/envs/mlops/lib/python312.zip\n",
+      "- /home/mushfiq/anaconda3/envs/mlops/lib/python3.12\n",
+      "- /home/mushfiq/anaconda3/envs/mlops/lib/python3.12/lib-dynload\n",
+      "- \n",
+      "- /home/mushfiq/anaconda3/envs/mlops/lib/python3.12/site-packages\n",
+      "---------------------------------------\n"
+     ]
+    }
+   ],
+   "source": [
+    "import os\n",
+    "import sys\n",
+    "from pathlib import Path\n",
+    "\n",
+    "current_notebook_location = Path(os.getcwd())\n",
+    "package_container_dir = current_notebook_location.parent\n",
+    "\n",
+    "path_to_add = str(package_container_dir.resolve())\n",
+    "\n",
+    "if path_to_add not in sys.path:\n",
+    "    sys.path.insert(0, path_to_add)\n",
+    "    print(f\"Added '{path_to_add}' to sys.path.\")\n",
+    "else:\n",
+    "    print(f\"'{path_to_add}' is already in sys.path.\")\n",
+    "\n",
+    "print(\"\\n--- Current sys.path for debugging: ---\")\n",
+    "for path in sys.path:\n",
+    "    print(f\"- {path}\")\n",
+    "print(\"---------------------------------------\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "a6012d35",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "from dataclasses import dataclass\n",
+    "from pathlib import Path\n",
+    "import urllib.request as request\n",
+    "import zipfile\n",
+    "\n",
+    "from src.ds_end_to_end.constants import CONFIG_FILE_PATH, PARAMS_FILE_PATH, SCHEMA_FILE_PATH\n",
+    "from src.ds_end_to_end.utils.common import read_yaml, create_directories\n",
+    "from src.ds_end_to_end import logger"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "71b204a8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "@dataclass\n",
+    "class DataIngestionConfig:\n",
+    "    root_dir: Path\n",
+    "    source_URL: str\n",
+    "    local_data_file: Path\n",
+    "    unzip_dir: Path"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "dcfb0f15",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class ConfigurationManager:\n",
+    "    def __init__(\n",
+    "        self,\n",
+    "        config_filepath: Path = CONFIG_FILE_PATH,\n",
+    "        params_filepath: Path = PARAMS_FILE_PATH,\n",
+    "        schema_filepath: Path = SCHEMA_FILE_PATH\n",
+    "    ):\n",
+    "        self.base_path = Path(sys.path[0])\n",
+    "\n",
+    "        absolute_config_path = self.base_path / config_filepath\n",
+    "        absolute_params_path = self.base_path / params_filepath\n",
+    "        absolute_schema_path = self.base_path / schema_filepath\n",
+    "\n",
+    "        self.config = read_yaml(absolute_config_path)\n",
+    "        self.params = read_yaml(absolute_params_path)\n",
+    "        self.schema = read_yaml(absolute_schema_path)\n",
+    "\n",
+    "        create_directories([self.base_path / Path(self.config.artifacts_root)])\n",
+    "\n",
+    "    def get_data_ingestion_config(self) -> DataIngestionConfig:\n",
+    "        config = self.config.data_ingestion\n",
+    "\n",
+    "        ingestion_root_dir = self.base_path / Path(config.root_dir)\n",
+    "        ingestion_local_data_file = self.base_path / Path(config.local_data_file)\n",
+    "        ingestion_unzip_dir = self.base_path / Path(config.unzip_dir)\n",
+    "\n",
+    "        create_directories([ingestion_root_dir])\n",
+    "\n",
+    "        data_ingestion_config = DataIngestionConfig(\n",
+    "            root_dir=ingestion_root_dir,\n",
+    "            source_URL=config.source_URL,\n",
+    "            local_data_file=ingestion_local_data_file,\n",
+    "            unzip_dir=ingestion_unzip_dir\n",
+    "        )\n",
+    "\n",
+    "        return data_ingestion_config"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "1c60aa2e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "class DataIngestion:\n",
+    "    def __init__(self, config: DataIngestionConfig):\n",
+    "        self.config = config\n",
+    "\n",
+    "    def download_file(self):\n",
+    "        if not self.config.local_data_file.exists():\n",
+    "            filename, headers = request.urlretrieve(\n",
+    "                url = self.config.source_URL,\n",
+    "                filename = str(self.config.local_data_file)\n",
+    "            )\n",
+    "            logger.info(f\"{filename} download! with following info: \\n{headers}\")\n",
+    "        else:\n",
+    "            logger.info(f\"File '{self.config.local_data_file}' already exists!\")\n",
+    "\n",
+    "    def extract_zip_file(self):\n",
+    "        \"\"\"\n",
+    "        Extracts the zip file into the data directory\n",
+    "        \"\"\"\n",
+    "        unzip_path = self.config.unzip_dir\n",
+    "        with zipfile.ZipFile(self.config.local_data_file, 'r') as zip_ref:\n",
+    "            zip_ref.extractall(unzip_path)\n",
+    "        logger.info(f\"Zip file extracted to: {unzip_path}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "320b18e3",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[2025-07-22 13:36:50,127: INFO: common: yaml file: /home/mushfiq/Desktop/End-to-End-MLOPS/ds_end_to_end/config/config.yaml loaded successfully]\n",
+      "[2025-07-22 13:36:50,128: INFO: common: yaml file: /home/mushfiq/Desktop/End-to-End-MLOPS/ds_end_to_end/params.yaml loaded successfully]\n",
+      "[2025-07-22 13:36:50,130: INFO: common: yaml file: /home/mushfiq/Desktop/End-to-End-MLOPS/ds_end_to_end/schema.yaml loaded successfully]\n",
+      "[2025-07-22 13:36:51,212: INFO: 966646210: /home/mushfiq/Desktop/End-to-End-MLOPS/ds_end_to_end/artifacts/data_ingestion/data.zip download! with following info: \n",
+      "Connection: close\n",
+      "Content-Length: 23329\n",
+      "Cache-Control: max-age=300\n",
+      "Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox\n",
+      "Content-Type: application/zip\n",
+      "ETag: \"c69888a4ae59bc5a893392785a938ccd4937981c06ba8a9d6a21aa52b4ab5b6e\"\n",
+      "Strict-Transport-Security: max-age=31536000\n",
+      "X-Content-Type-Options: nosniff\n",
+      "X-Frame-Options: deny\n",
+      "X-XSS-Protection: 1; mode=block\n",
+      "X-GitHub-Request-Id: A904:1CF3A8:1EDB1E:22A0D2:687F3F92\n",
+      "Accept-Ranges: bytes\n",
+      "Date: Tue, 22 Jul 2025 07:36:51 GMT\n",
+      "Via: 1.1 varnish\n",
+      "X-Served-By: cache-sin-wsss1830042-SIN\n",
+      "X-Cache: MISS\n",
+      "X-Cache-Hits: 0\n",
+      "X-Timer: S1753169811.899640,VS0,VE291\n",
+      "Vary: Authorization,Accept-Encoding\n",
+      "Access-Control-Allow-Origin: *\n",
+      "Cross-Origin-Resource-Policy: cross-origin\n",
+      "X-Fastly-Request-ID: 30a1c9077889d820442acb7de46f60e5ca89a22c\n",
+      "Expires: Tue, 22 Jul 2025 07:41:51 GMT\n",
+      "Source-Age: 0\n",
+      "\n",
+      "]\n",
+      "[2025-07-22 13:36:51,218: INFO: 966646210: Zip file extracted to: /home/mushfiq/Desktop/End-to-End-MLOPS/ds_end_to_end/artifacts/data_ingestion]\n",
+      "[2025-07-22 13:36:51,219: INFO: 3929869767: Data Ingestion process completed successfully!]\n"
+     ]
+    }
+   ],
+   "source": [
+    "try:\n",
+    "    config = ConfigurationManager()\n",
+    "    data_ingestion_config = config.get_data_ingestion_config()\n",
+    "    data_ingestion = DataIngestion(config=data_ingestion_config)\n",
+    "    data_ingestion.download_file()\n",
+    "    data_ingestion.extract_zip_file()\n",
+    "    logger.info(\"Data Ingestion process completed successfully!\")\n",
+    "except Exception as e:\n",
+    "    logger.exception(f\"Error during Data Ingestion: {e}\")\n",
+    "    raise e"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "mlops",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+
+
+****************************************************************************************************
+File: .github/workflows/.gitkeep
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: templates/index.html
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: src/ds_end_to_end/__init__.py
+****************************************************************************************************
+
+import os
+import sys
+import logging
+
+logging_str = "[%(asctime)s: %(levelname)s: %(module)s: %(message)s]"
+log_dir = "logs"
+
+log_filepath = os.path.join(log_dir, "running_logs.log")
+os.makedirs(log_dir, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format=logging_str,
+    handlers=[
+        logging.FileHandler(log_filepath),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger("datasciencelogger")
+
+****************************************************************************************************
+File: src/ds_end_to_end/pipeline/data_validation_pipe.py
+****************************************************************************************************
+
+from src.ds_end_to_end.components.data_validation import DataValidation
+from src.ds_end_to_end import logger
+from src.ds_end_to_end.config.configuration import ConfigurationManager
+
+STAGE_NAME = "Data Validation stage"
+
+class DataValidationTrainingPipeline:
+    def __init__(self):
+        pass
+
+    def initiate_data_validation(self):
+        config = ConfigurationManager()
+        data_validation_config = config.get_data_validation_config()
+        data_validation = DataValidation(config=data_validation_config)
+        data_validation.validate_all_columns()
+
+if __name__ == "__main__":
+    try:
+        logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+        obj = DataValidationTrainingPipeline()
+        obj.main()
+        logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+    except Exception as e:
+        logger.exception(e)
+        raise e
+
+****************************************************************************************************
+File: src/ds_end_to_end/pipeline/data_transformation_pipe.py
+****************************************************************************************************
+
+from src.ds_end_to_end.components.data_transformation import DataTransformation
+from src.ds_end_to_end import logger
+from pathlib import Path
+from src.ds_end_to_end.config.configuration import ConfigurationManager
+
+STAGE_NAME = "Data Transformation stage"
+
+class DataTransformationTrainingPipeline:
+    def __init__(self):
+        pass
+
+    def initiate_data_transformation(self):
+        try:
+            with open(Path("artifacts/data_validation/status.txt"), "r") as f:
+                status = f.read().split(" ")[-1]
+
+            if status == "True":
+                config = ConfigurationManager()
+                data_transformation_config = config.get_data_transformation_config()
+                data_transformation = DataTransformation(config=data_transformation_config)
+                data_transformation.train_test_spliting()
+
+            else:
+                raise Exception("Data validation stage failed")
+
+        except Exception as e:
+            raise e
+
+
+
+****************************************************************************************************
+File: src/ds_end_to_end/pipeline/model_trainer_pipe.py
+****************************************************************************************************
+
+from src.ds_end_to_end.components.model_trainer import ModelTrainer
+from src.ds_end_to_end import logger
+from src.ds_end_to_end.config.configuration import ConfigurationManager
+
+STAGE_NAME = "Model Trainer stage"
+
+class ModelTrainerTrainingPipeline:
+    def __init__(self):
+        self.config = ConfigurationManager()
+        self.model_trainer = ModelTrainer(config=self.config.get_model_trainer_config())
+
+    def initiate_model_training(self):
+        config = ConfigurationManager()
+        model_trainer_config = config.get_model_trainer_config()
+        model_trainer = ModelTrainer(config=model_trainer_config)
+        model_trainer.train()
+
+****************************************************************************************************
+File: src/ds_end_to_end/pipeline/__init__.py
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: src/ds_end_to_end/pipeline/data_ingestion_pipe.py
+****************************************************************************************************
+
+from src.ds_end_to_end.components.data_ingestion import DataIngestion
+from src.ds_end_to_end import logger
+from src.ds_end_to_end.config.configuration import ConfigurationManager
+
+STAGE_NAME = "Data Ingestion stage"
+
+class DataIngestionTrainingPipeline:
+    def __init__(self):
+        pass
+
+    def initialize_data_ingestion(self):
+        config = ConfigurationManager()
+        data_ingestion_config = config.get_data_ingestion_config()
+        data_ingestion = DataIngestion(config=data_ingestion_config)
+        data_ingestion.download_file()
+        data_ingestion.extract_zip_file()
+
+if __name__ == "__main__":
+    try:
+        logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+        obj = DataIngestionTrainingPipeline()
+        obj.initialize_data_ingestion()
+        logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+    except Exception as e:
+        logger.exception(e)
+        raise e
+
+
+****************************************************************************************************
+File: src/ds_end_to_end/components/model_trainer.py
+****************************************************************************************************
+
+import pandas as pd
+import os
+from src.ds_end_to_end import logger
+from sklearn.linear_model import ElasticNet
+import joblib
+from src.ds_end_to_end.entity.config_entity import ModelTrainerConfig
+
+class ModelTrainer:
+    def __init__(self, config: ModelTrainerConfig):
+        self.config = config
+    
+    def train(self):
+        train_data = pd.read_csv(self.config.train_data_path)
+        test_data = pd.read_csv(self.config.test_data_path)
+
+        train_x = train_data.drop([self.config.target_column], axis=1)
+        test_x = test_data.drop([self.config.target_column], axis=1)
+        train_y = train_data[[self.config.target_column]]
+        test_y = test_data[[self.config.target_column]]
+
+        lr = ElasticNet(alpha=self.config.alpha, l1_ratio=self.config.l1_ratio, random_state=42)
+        lr.fit(train_x, train_y)
+
+        joblib.dump(lr, os.path.join(self.config.root_dir, self.config.model_name))
+
+****************************************************************************************************
+File: src/ds_end_to_end/components/data_ingestion.py
+****************************************************************************************************
+
+import urllib.request as request
+import zipfile
+from src.ds_end_to_end import logger
+from src.ds_end_to_end.entity.config_entity import DataIngestionConfig
+
+class DataIngestion:
+    def __init__(self, config: DataIngestionConfig):
+        self.config = config
+
+    def download_file(self):
+        if not self.config.local_data_file.exists():
+            filename, headers = request.urlretrieve(
+                url = self.config.source_URL,
+                filename = str(self.config.local_data_file)
+            )
+            logger.info(f"{filename} download! with following info: \n{headers}")
+        else:
+            logger.info(f"File '{self.config.local_data_file}' already exists!")
+
+    def extract_zip_file(self):
+        """
+        Extracts the zip file into the data directory
+        """
+        unzip_path = self.config.unzip_dir
+        with zipfile.ZipFile(self.config.local_data_file, 'r') as zip_ref:
+            zip_ref.extractall(unzip_path)
+        logger.info(f"Zip file extracted to: {unzip_path}")
+
+****************************************************************************************************
+File: src/ds_end_to_end/components/data_transformation.py
+****************************************************************************************************
+
+import os
+import pandas as pd
+from src.ds_end_to_end import logger
+from sklearn.model_selection import train_test_split
+from src.ds_end_to_end.entity.config_entity import DataTransformationConfig
+
+class DataTransformation:
+    def __init__(self, config: DataTransformationConfig):
+        self.config = config
+
+    # note: you can add different data transformation techniques
+    # i am only adding train test split
+    # as the data is already cleaned up
+
+    def train_test_spliting(self):
+        data = pd.read_csv(self.config.data_path)
+
+        train_data, test_data = train_test_split(data)
+
+        train_data.to_csv(os.path.join(self.config.root_dir, "train.csv"), index = False)
+        test_data.to_csv(os.path.join(self.config.root_dir, "test.csv"), index = False)
+
+        logger.info("Splited data into train and test")
+        logger.info(f"Train data: {train_data.shape}")
+        logger.info(f"Test data: {test_data.shape}")
+
+****************************************************************************************************
+File: src/ds_end_to_end/components/data_validation.py
+****************************************************************************************************
+
+import os
+import pandas as pd
+from src.ds_end_to_end import logger
+from src.ds_end_to_end.entity.config_entity import DataValidationConfig
+
+class DataValidation:
+    def __init__(self, config: DataValidationConfig):
+        self.config = config
+
+    def validate_all_columns(self) -> bool:
+        try:
+            validation_status = None
+
+            data = pd.read_csv(self.config.unzip_data_dir)
+            all_cols = list(data.columns)
+
+            all_schema = self.config.all_schema.keys()
+
+            for col in all_cols:
+                if col not in all_schema:
+                    validation_status = False
+                    with open(self.config.STATUS_FILE, 'w') as f:
+                        f.write(f"Validation status: {validation_status}")
+                else:
+                    validation_status = True
+                    with open(self.config.STATUS_FILE, 'w') as f:
+                        f.write(f"Validation status: {validation_status}")
+
+            return validation_status
+        
+        except Exception as e:
+            raise e
+
+****************************************************************************************************
+File: src/ds_end_to_end/components/__init__.py
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: src/ds_end_to_end/utils/common.py
+****************************************************************************************************
+
+import os
+import yaml
+from src.ds_end_to_end import logger
+import json
+import joblib
+from ensure import ensure_annotations
+from box import ConfigBox
+from pathlib import Path
+from typing import Any
+from box.exceptions import BoxValueError
+
+@ensure_annotations
+def read_yaml(path_to_yaml: Path) -> ConfigBox:
+    try:
+        with open(path_to_yaml) as yaml_file:
+            content = yaml.safe_load(yaml_file)
+            logger.info(f"yaml file: {path_to_yaml} loaded successfully")
+            return ConfigBox(content, custom_resolver=None)
+    except BoxValueError:
+        raise ValueError("yaml file is empty")
+    except Exception as e:
+        raise e
+    
+@ensure_annotations
+def create_directories(path_to_directories: list, verbose=False):
+    for path in path_to_directories:
+        os.makedirs(path, exist_ok=True)
+        if verbose:
+            logger.info(f"created directory at: {path}")
+
+@ensure_annotations
+def save_json(content: Any, path: Path):
+    with open(path, "w") as f:
+        json.dump(content, f, indent=4)
+
+    logger.info(f"json file saved at: {path}")
+
+@ensure_annotations
+def load_json(path: Path) -> ConfigBox:
+    with open(path) as f:
+        content = json.load(f)
+
+    logger.info(f"json file loaded successfully from: {path}")
+    return ConfigBox(content, custom_resolver=None)
+
+
+@ensure_annotations
+def save_binary(file_path: Path, obj: Any):
+    joblib.dump(obj, file_path)
+    logger.info(f"binary file saved at: {file_path}")
+
+@ensure_annotations
+def load_binary(file_path: Path) -> Any:
+    obj = joblib.load(file_path)
+    logger.info(f"binary file loaded from: {file_path}")
+    return obj
+
+****************************************************************************************************
+File: src/ds_end_to_end/utils/__init__.py
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: src/ds_end_to_end/constants/__init__.py
+****************************************************************************************************
+
+from pathlib import Path
+
+CONFIG_FILE_PATH = Path("config/config.yaml")
+PARAMS_FILE_PATH = Path("params.yaml")
+SCHEMA_FILE_PATH = Path("schema.yaml")
+
+****************************************************************************************************
+File: src/ds_end_to_end/config/configuration.py
+****************************************************************************************************
+
+import sys
+from src.ds_end_to_end.constants import CONFIG_FILE_PATH, PARAMS_FILE_PATH, SCHEMA_FILE_PATH
+from src.ds_end_to_end.utils.common import read_yaml, create_directories
+from pathlib import Path
+from src.ds_end_to_end.entity.config_entity import (DataIngestionConfig, 
+    DataValidationConfig, 
+    DataTransformationConfig,
+    ModelTrainerConfig
+)
+
+class ConfigurationManager:
+    def __init__(
+        self,
+        config_filepath: Path = CONFIG_FILE_PATH,
+        params_filepath: Path = PARAMS_FILE_PATH,
+        schema_filepath: Path = SCHEMA_FILE_PATH
+    ):
+        self.base_path = Path(sys.path[0])
+
+        absolute_config_path = self.base_path / config_filepath
+        absolute_params_path = self.base_path / params_filepath
+        absolute_schema_path = self.base_path / schema_filepath
+
+        self.config = read_yaml(absolute_config_path)
+        self.params = read_yaml(absolute_params_path)
+        self.schema = read_yaml(absolute_schema_path)
+
+        create_directories([self.base_path / Path(self.config.artifacts_root)])
+
+    def get_data_ingestion_config(self) -> DataIngestionConfig:
+        config = self.config.data_ingestion
+
+        ingestion_root_dir = self.base_path / Path(config.root_dir)
+        ingestion_local_data_file = self.base_path / Path(config.local_data_file)
+        ingestion_unzip_dir = self.base_path / Path(config.unzip_dir)
+
+        create_directories([ingestion_root_dir])
+
+        data_ingestion_config = DataIngestionConfig(
+            root_dir=ingestion_root_dir,
+            source_URL=config.source_URL,
+            local_data_file=ingestion_local_data_file,
+            unzip_dir=ingestion_unzip_dir
+        )
+
+        return data_ingestion_config
+    
+    def get_data_validation_config(self) -> DataValidationConfig:
+        config = self.config.data_validation
+        schema = self.schema.COLUMNS
+
+        create_directories([config.root_dir])
+
+        data_validation_config = DataValidationConfig(
+            root_dir=config.root_dir,
+            STATUS_FILE=config.STATUS_FILE,
+            unzip_data_dir = config.unzip_data_dir,
+            all_schema=schema
+        )
+
+        return data_validation_config
+    
+    def get_data_transformation_config(self) -> DataTransformationConfig:
+        config = self.config.data_transformation
+
+        create_directories([config.root_dir])
+
+        data_transformation_config = DataTransformationConfig(
+            root_dir=config.root_dir,
+            data_path=config.data_path,
+        )
+
+        return data_transformation_config
+    
+    def get_model_trainer_config(self) -> ModelTrainerConfig:
+        config = self.config.model_trainer
+        params = self.params.ElasticNet
+        schema = self.schema.TARGET_COLUMN
+
+        create_directories([config.root_dir])
+
+        model_trainer_config = ModelTrainerConfig(
+            root_dir=config.root_dir,
+            train_data_path=config.train_data_path,
+            test_data_path=config.test_data_path,
+            model_name=config.model_name,
+            alpha=params.alpha,
+            l1_ratio=params.l1_ratio,
+            target_column=schema.name
+        )
+
+        return model_trainer_config
+
+****************************************************************************************************
+File: src/ds_end_to_end/config/__init__.py
+****************************************************************************************************
+
+
+
+****************************************************************************************************
+File: src/ds_end_to_end/entity/config_entity.py
+****************************************************************************************************
+
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass
+class DataIngestionConfig:
+    root_dir: Path
+    source_URL: str
+    local_data_file: Path
+    unzip_dir: Path
+
+@dataclass
+class DataValidationConfig:
+    root_dir: Path
+    STATUS_FILE: str
+    unzip_data_dir: Path
+    all_schema: dict
+
+@dataclass
+class DataTransformationConfig:
+    root_dir: Path
+    data_path: Path
+
+@dataclass
+class ModelTrainerConfig:
+    root_dir: Path
+    train_data_path: Path
+    test_data_path: Path
+    model_name: str
+    alpha: float
+    l1_ratio: float
+    target_column: str
+
+****************************************************************************************************
+File: src/ds_end_to_end/entity/__init__.py
+****************************************************************************************************
+
+
+

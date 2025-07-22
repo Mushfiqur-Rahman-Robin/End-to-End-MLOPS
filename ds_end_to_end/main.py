@@ -1,12 +1,17 @@
+import os
+from dotenv import load_dotenv
+import mlflow
+load_dotenv()
+
 from src.ds_end_to_end import logger
 from src.ds_end_to_end.pipeline.data_ingestion_pipe import DataIngestionTrainingPipeline
 from src.ds_end_to_end.pipeline.data_validation_pipe import DataValidationTrainingPipeline
 from src.ds_end_to_end.pipeline.data_transformation_pipe import DataTransformationTrainingPipeline
 from src.ds_end_to_end.pipeline.model_trainer_pipe import ModelTrainerTrainingPipeline
+from src.ds_end_to_end.pipeline.model_evaluation_pipe import ModelEvaluationTrainingPipeline
 
 
 STAGE_NAME = "Data Ingestion stage"
-
 try:
     logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
     obj = DataIngestionTrainingPipeline()
@@ -17,7 +22,6 @@ except Exception as e:
     raise e
 
 STAGE_NAME = "Data Validation stage"
-
 try:
     logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
     obj = DataValidationTrainingPipeline()
@@ -28,7 +32,6 @@ except Exception as e:
     raise e
 
 STAGE_NAME = "Data Transformation stage"
-
 try:
     logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
     obj = DataTransformationTrainingPipeline()
@@ -39,11 +42,20 @@ except Exception as e:
     raise e
 
 STAGE_NAME = "Model Trainer stage"
-
 try:
     logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
     obj = ModelTrainerTrainingPipeline()
     obj.initiate_model_training()
+    logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
+except Exception as e:
+    logger.exception(e)
+    raise e
+
+STAGE_NAME = "Model Evaluation stage"
+try:
+    logger.info(f">>>>>> stage {STAGE_NAME} started <<<<<<")
+    obj = ModelEvaluationTrainingPipeline()
+    obj.initiate_model_evaluation()
     logger.info(f">>>>>> stage {STAGE_NAME} completed <<<<<<\n\nx==========x")
 except Exception as e:
     logger.exception(e)

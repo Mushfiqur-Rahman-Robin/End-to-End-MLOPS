@@ -4,3 +4,4 @@ mlartifacts/
 models/
 __pycache__
 logs/
+codetotext.py

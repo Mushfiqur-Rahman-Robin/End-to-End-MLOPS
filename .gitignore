@@ -6,3 +6,4 @@ __pycache__
 logs/
 codetotext.py
 final_models/
+prediction_output/

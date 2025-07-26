@@ -139,6 +139,8 @@ class ModelTrainer:
             logging.info(f"Logging NetworkModel as MLflow artifact from {self.model_trainer_config.trained_model_file_path}")
             mlflow.log_artifact(local_path=self.model_trainer_config.trained_model_file_path, artifact_path="trained_model")
 
+            save_object("final_models/model.pkl", best_model)
+
             model_trainer_artifact = ModelTrainerArtifact(
                 trained_model_file_path=self.model_trainer_config.trained_model_file_path,
                 train_metric_artifact=classification_train_metric,

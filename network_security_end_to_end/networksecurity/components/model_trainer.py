@@ -1,9 +1,9 @@
-# File: networksecurity/components/model_trainer.py
-
 import os
 import sys
+import mlflow.sklearn
 import numpy as np
 import pandas as pd
+import mlflow
 
 from networksecurity.exception.exception import NetworkSecurityException
 from networksecurity.logging.logger import logging
@@ -33,107 +33,121 @@ class ModelTrainer:
             self.data_transformation_artifact = data_transformation_artifact
         except Exception as e:
             raise NetworkSecurityException(e, sys)
-        
+
     def train_model(self, x_train, y_train, x_test, y_test):
         logging.info("Starting model training within train_model method.")
-        models = {
-            "Random Forest": RandomForestClassifier(verbose=1),
-            "Decision Tree": DecisionTreeClassifier(),
-            "Gradient Boosting": GradientBoostingClassifier(verbose=1),
-            "Logistic Regression": LogisticRegression(verbose=1, solver='liblinear'), 
-            "AdaBoost": AdaBoostClassifier()
-        }
         
-        params = {
-            "Decision Tree": {"criterion": ["gini", "entropy"]},
-            "Random Forest": {
-                "criterion": ["gini", "entropy"],
-                "max_features": ["log2", "sqrt"],
-                "n_estimators": [50, 100, 150],
-            },
-            "AdaBoost": {
-                'learning_rate': [0.01, 0.1, 0.5, 1.],
-                'n_estimators': [50, 100, 150]
-            },
-            "Gradient Boosting": {
-                "learning_rate": [0.1, 0.01, 0.05],
-                "subsample": [0.6, 0.7, 0.9],
-                "max_depth": [4, 5, 6],
-            },
-            "Logistic Regression": {
-                'penalty': ['l1', 'l2'],
-                'C': [0.001, 0.01, 0.1, 1, 10, 100]
-            },
-        }
+        with mlflow.start_run() as run:
+            run_id = run.info.run_id
+            logging.info(f"MLflow Run ID: {run_id}")
+            print(f"MLflow Run ID: {run_id}")
 
-        model_report: dict = evaluate_models(x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test, models=models, params=params)
-        
-        filtered_model_report_values = [score for score in model_report.values() if not pd.isna(score)]
-        
-        if not filtered_model_report_values:
-            raise Exception("All models failed to train or produce valid scores. Cannot determine best model.")
+            models = {
+                "Random Forest": RandomForestClassifier(verbose=0),
+                "Decision Tree": DecisionTreeClassifier(),
+                "Gradient Boosting": GradientBoostingClassifier(verbose=0),
+                "Logistic Regression": LogisticRegression(verbose=0, solver='liblinear'), 
+                "AdaBoost": AdaBoostClassifier()
+            }
+            
+            params = {
+                "Decision Tree": {"criterion": ["gini", "entropy"]},
+                "Random Forest": {
+                    "criterion": ["gini", "entropy"],
+                    "max_features": ["log2", "sqrt"],
+                    "n_estimators": [50, 100, 150],
+                },
+                "AdaBoost": {
+                    'learning_rate': [0.01, 0.1, 0.5, 1.],
+                    'n_estimators': [50, 100, 150]
+                },
+                "Gradient Boosting": {
+                    "learning_rate": [0.1, 0.01, 0.05],
+                    "subsample": [0.6, 0.7, 0.9],
+                    "max_depth": [4, 5, 6],
+                },
+                "Logistic Regression": {
+                    'penalty': ['l1', 'l2'],
+                    'C': [0.001, 0.01, 0.1, 1, 10, 100]
+                },
+            }
 
-        best_model_score = max(filtered_model_report_values)
+            model_report: dict = evaluate_models(x_train=x_train, y_train=y_train, x_test=x_test, y_test=y_test, models=models, params=params)
+            
+            filtered_model_report_values = [score for score in model_report.values() if not pd.isna(score)]
+            
+            if not filtered_model_report_values:
+                raise Exception("All models failed to train or produce valid scores. Cannot determine best model.")
 
-        best_model_name = None
-        for name, score in model_report.items():
-            if not pd.isna(score) and score == best_model_score:
-                best_model_name = name
-                break
-        
-        if best_model_name is None:
-            raise Exception("Could not determine best model name even after filtering NaN scores.")
+            best_model_score = max(filtered_model_report_values)
 
-        best_model = models[best_model_name]
-        
-        logging.info(f"Retraining best model '{best_model_name}' on full training data.")
+            best_model_name = None
+            for name, score in model_report.items():
+                if not pd.isna(score) and score == best_model_score:
+                    best_model_name = name
+                    break
+            
+            if best_model_name is None:
+                raise Exception("Could not determine best model name even after filtering NaN scores.")
 
-        # Predictions and metrics for train set
-        y_train_pred = best_model.predict(x_train)
-        classification_train_metric = get_classification_score(y_true=y_train, y_pred=y_train_pred)
-        logging.info(f"Train metrics for {best_model_name}: {classification_train_metric}")
+            best_model = models[best_model_name]
+            
+            logging.info(f"Retraining best model '{best_model_name}' on full training data.")
+            mlflow.log_param("best_model_name", best_model_name)
 
-        # Predictions and metrics for test set
-        y_test_pred = best_model.predict(x_test)
-        classification_test_metric = get_classification_score(y_true=y_test, y_pred=y_test_pred)
-        logging.info(f"Test metrics for {best_model_name}: {classification_test_metric}")
+            y_train_pred = best_model.predict(x_train)
+            classification_train_metric = get_classification_score(y_true=y_train, y_pred=y_train_pred)
+            logging.info(f"Train metrics for {best_model_name}: {classification_train_metric}")
 
-        # Check for overfitting/underfitting
-        diff = abs(classification_train_metric.f1_score - classification_test_metric.f1_score)
-        if diff > self.model_trainer_config.overfitting_underfitting_threshold:
-            logging.warning(f"Model is potentially overfitting or underfitting. Train F1: {classification_train_metric.f1_score}, Test F1: {classification_test_metric.f1_score}, Diff: {diff}")
+            mlflow.log_metric("train_f1_score", classification_train_metric.f1_score)
+            mlflow.log_metric("train_precision_score", classification_train_metric.precision_score)
+            mlflow.log_metric("train_recall_score", classification_train_metric.recall_score)
 
-        # Check if model meets expected accuracy
-        if classification_test_metric.f1_score < self.model_trainer_config.expected_accuracy:
-            logging.warning(f"Trained model does not meet expected accuracy. Expected: {self.model_trainer_config.expected_accuracy}, Actual: {classification_test_metric.f1_score}")
+            y_test_pred = best_model.predict(x_test)
+            classification_test_metric = get_classification_score(y_true=y_test, y_pred=y_test_pred)
+            logging.info(f"Test metrics for {best_model_name}: {classification_test_metric}")
 
+            mlflow.log_metric("test_f1_score", classification_test_metric.f1_score)
+            mlflow.log_metric("test_precision_score", classification_test_metric.precision_score)
+            mlflow.log_metric("test_recall_score", classification_test_metric.recall_score)
 
-        # Load preprocessor object
-        logging.info("Loading preprocessor object.")
-        preprocessor = load_object(file_path=self.data_transformation_artifact.transformed_object_file_path)
+            diff = abs(classification_train_metric.f1_score - classification_test_metric.f1_score)
+            if diff > self.model_trainer_config.overfitting_underfitting_threshold:
+                logging.warning(f"Model is potentially overfitting or underfitting. Train F1: {classification_train_metric.f1_score}, Test F1: {classification_test_metric.f1_score}, Diff: {diff}")
+                mlflow.log_param("overfitting_underfitting_status", "WARNING: Potential Overfitting/Underfitting")
+            else:
+                mlflow.log_param("overfitting_underfitting_status", "OK")
 
-        # Create directory for trained model
-        model_dir_path = os.path.dirname(self.model_trainer_config.trained_model_file_path)
-        os.makedirs(model_dir_path, exist_ok=True)
+            if classification_test_metric.f1_score < self.model_trainer_config.expected_accuracy:
+                logging.warning(f"Trained model does not meet expected accuracy. Expected: {self.model_trainer_config.expected_accuracy}, Actual: {classification_test_metric.f1_score}")
+                mlflow.log_param("accuracy_threshold_status", "WARNING: Did Not Meet Expected Accuracy")
+            else:
+                mlflow.log_param("accuracy_threshold_status", "OK")
 
-        # Create NetworkModel (pipeline of preprocessor + model)
-        logging.info("Creating NetworkModel object (preprocessor + best model).")
-        network_model = NetworkModel(preprocessor=preprocessor, model=best_model)
-        
-        # Save the NetworkModel
-        logging.info(f"Saving NetworkModel to {self.model_trainer_config.trained_model_file_path}")
-        save_object(file_path=self.model_trainer_config.trained_model_file_path, obj=network_model)
+            logging.info("Loading preprocessor object.")
+            preprocessor = load_object(file_path=self.data_transformation_artifact.transformed_object_file_path)
 
-        # Create and return ModelTrainerArtifact
-        model_trainer_artifact = ModelTrainerArtifact(
-            trained_model_file_path=self.model_trainer_config.trained_model_file_path,
-            train_metric_artifact=classification_train_metric,
-            test_metric_artifact=classification_test_metric
-        )
+            model_dir_path = os.path.dirname(self.model_trainer_config.trained_model_file_path)
+            os.makedirs(model_dir_path, exist_ok=True)
 
-        logging.info(f"Model Trainer artifact: {model_trainer_artifact}")
+            logging.info("Creating NetworkModel object (preprocessor + best model).")
+            network_model = NetworkModel(preprocessor=preprocessor, model=best_model)
+            
+            logging.info(f"Saving NetworkModel locally to {self.model_trainer_config.trained_model_file_path}")
+            save_object(file_path=self.model_trainer_config.trained_model_file_path, obj=network_model)
 
-        return model_trainer_artifact
+            logging.info(f"Logging NetworkModel as MLflow artifact from {self.model_trainer_config.trained_model_file_path}")
+            mlflow.log_artifact(local_path=self.model_trainer_config.trained_model_file_path, artifact_path="trained_model")
+
+            model_trainer_artifact = ModelTrainerArtifact(
+                trained_model_file_path=self.model_trainer_config.trained_model_file_path,
+                train_metric_artifact=classification_train_metric,
+                test_metric_artifact=classification_test_metric
+            )
+
+            logging.info(f"Model Trainer artifact: {model_trainer_artifact}")
+
+            return model_trainer_artifact
         
     def initiate_model_trainer(self) -> ModelTrainerArtifact:
         logging.info("Initiating model training process.")

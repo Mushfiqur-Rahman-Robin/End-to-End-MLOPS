@@ -8,5 +8,6 @@ pymongo
 scikit-learn
 dill
 pyYaml
+mlflow
 
 # -e .

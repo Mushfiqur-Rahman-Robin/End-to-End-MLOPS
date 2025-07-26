@@ -18,6 +18,8 @@ SCHEMA_FILE_PATH = os.path.join("data-schema", "schema.yaml")
 SAVED_MODEL_DIR = os.path.join("saved_models")
 MODEL_FILE_NAME = "model.pkl"
 
+TRAINING_BUCKET_NAME = "networksecuritytrainingbucket"
+
 # data ingestion related constants
 
 DATA_INGESTION_COLLECTION_NAME: str = "phising_data"

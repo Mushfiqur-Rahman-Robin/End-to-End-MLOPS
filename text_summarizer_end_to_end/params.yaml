@@ -1,1 +1,11 @@
-key: "value"
+TrainingArguments:
+  num_train_epochs: 1
+  warmup_steps: 10
+  per_device_train_batch_size: 1
+  weight_decay: 0.01
+  logging_steps: 10
+  eval_strategy: steps
+  save_steps: 10
+  eval_steps: 50
+  save_steps: 100
+  gradient_accumulation_steps: 2

@@ -2,7 +2,7 @@ from pathlib import Path
 from src.textsummarizer.constants import *
 from src.textsummarizer.utils.common import read_yaml, create_directories
 from src.textsummarizer.constants import CONFIG_FILE_PATH, PARAMS_FILE_PATH
-from src.textsummarizer.entity.config_entity import DataIngestionConfig, DataTransformationConfig, ModelTrainerConfig
+from src.textsummarizer.entity.config_entity import DataIngestionConfig, DataTransformationConfig, ModelTrainerConfig, ModelEvaluationConfig
 
 class ConfigurationManager:
     def __init__(
@@ -66,3 +66,18 @@ class ConfigurationManager:
         )
 
         return model_trainer_config
+    
+    def get_model_evaluation_config(self) -> ModelEvaluationConfig:
+        config = self.config.model_evaluation
+
+        create_directories([config.root_dir])
+
+        model_evaluation_config = ModelEvaluationConfig(
+            root_dir=Path(config.root_dir),
+            data_path=Path(config.data_path),
+            model_path=Path(config.model_path),
+            tokenizer_path=Path(config.tokenizer_path),
+            metric_file_name=Path(config.metric_file_name)
+        )
+
+        return model_evaluation_config

@@ -9,3 +9,4 @@ final_models/
 prediction_output/
 *.egg-info/
 catboost_info/
+artifacts/
